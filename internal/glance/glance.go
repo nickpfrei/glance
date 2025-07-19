@@ -269,6 +269,33 @@ func (p *page) updateOutdatedWidgets() {
 	wg.Wait()
 }
 
+func (p *page) forceUpdateAllWidgets() {
+	var wg sync.WaitGroup
+	context := context.Background()
+
+	for w := range p.HeadWidgets {
+		widget := p.HeadWidgets[w]
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			widget.update(context)
+		}()
+	}
+
+	for c := range p.Columns {
+		for w := range p.Columns[c].Widgets {
+			widget := p.Columns[c].Widgets[w]
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				widget.update(context)
+			}()
+		}
+	}
+
+	wg.Wait()
+}
+
 func (a *application) resolveUserDefinedAssetPath(path string) string {
 	if strings.HasPrefix(path, "/assets/") {
 		return a.Config.Server.BaseURL + path
@@ -320,6 +347,18 @@ func (a *application) handlePageRequest(w http.ResponseWriter, r *http.Request) 
 	}
 	a.populateTemplateRequestData(&data.Request, r)
 
+	// Wait for widgets to be ready before rendering the initial page
+	func() {
+		page.mu.Lock()
+		defer page.mu.Unlock()
+
+		// Force update all widgets regardless of cache status
+		page.forceUpdateAllWidgets()
+		
+		// Wait for all widgets to be ready (especially video widgets)
+		page.waitForWidgetsReady()
+	}()
+
 	var responseBytes bytes.Buffer
 	err := pageTemplate.Execute(&responseBytes, data)
 	if err != nil {
@@ -353,7 +392,12 @@ func (a *application) handlePageContentRequest(w http.ResponseWriter, r *http.Re
 		page.mu.Lock()
 		defer page.mu.Unlock()
 
+		// Update all widgets first
 		page.updateOutdatedWidgets()
+		
+		// Wait for all widgets to be ready (especially video widgets)
+		page.waitForWidgetsReady()
+		
 		err = pageContentTemplate.Execute(&responseBytes, pageData)
 	}()
 

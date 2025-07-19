@@ -136,6 +136,9 @@ type widget interface {
 	setID(uint64)
 	handleRequest(w http.ResponseWriter, r *http.Request)
 	setHideHeader(bool)
+	
+	// Add ContentAvailable to the interface
+	IsContentAvailable() bool
 }
 
 type cacheType int
@@ -200,6 +203,10 @@ func (w *widgetBase) setID(id uint64) {
 
 func (w *widgetBase) setHideHeader(value bool) {
 	w.HideHeader = value
+}
+
+func (w *widgetBase) IsContentAvailable() bool {
+	return w.ContentAvailable
 }
 
 func (widget *widgetBase) handleRequest(w http.ResponseWriter, r *http.Request) {

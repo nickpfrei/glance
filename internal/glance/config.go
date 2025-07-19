@@ -91,6 +91,49 @@ type page struct {
 	mu                 sync.Mutex `yaml:"-"`
 }
 
+func (p *page) waitForWidgetsReady() {
+	// Wait for all widgets to be ready, especially video widgets
+	maxWaitTime := 30 * time.Second
+	startTime := time.Now()
+	
+	for time.Since(startTime) < maxWaitTime {
+		allReady := true
+		
+		// Check head widgets
+		for _, widget := range p.HeadWidgets {
+			if !widget.IsContentAvailable() {
+				allReady = false
+				break
+			}
+		}
+		
+		// Check column widgets
+		if allReady {
+			for _, column := range p.Columns {
+				for _, widget := range column.Widgets {
+					if !widget.IsContentAvailable() {
+						allReady = false
+						break
+					}
+				}
+				if !allReady {
+					break
+				}
+			}
+		}
+		
+		if allReady {
+			return
+		}
+		
+		// Wait a bit before checking again
+		time.Sleep(100 * time.Millisecond)
+	}
+	
+	// If we timeout, log a warning but continue
+	log.Printf("Warning: Some widgets may not be fully loaded after 30 seconds")
+}
+
 func newConfigFromYAML(contents []byte) (*config, error) {
 	contents, err := parseConfigVariables(contents)
 	if err != nil {

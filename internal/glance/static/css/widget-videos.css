@@ -11,3 +11,17 @@
     object-fit: cover;
     border-radius: var(--border-radius);
 }
+
+/* Loading state styling */
+.widget-loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-color);
+    opacity: 0.7;
+    font-style: italic;
+}
+
+.widget-loading::before {
+    content: "⏳ ";
+    margin-right: 0.5rem;
+}
