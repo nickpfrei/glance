@@ -142,26 +142,32 @@ func (widget *videosWidget) initialize() error {
 	// Mark as first load and set ContentAvailable to false initially
 	widget.isFirstLoad = true
 	widget.ContentAvailable = false
+	
+	// Force immediate update by setting nextUpdate to now
+	widget.nextUpdate = time.Now()
 
 	return nil
 }
 
 // update handles the widget update cycle with progressive caching
 func (widget *videosWidget) update(ctx context.Context) {
-	// Always fetch videos, but adjust cache duration based on load state
-	if widget.isFirstLoad && !widget.ContentAvailable {
-		slog.Info("Video widget first load - fetching videos with short cache")
-		widget.withCacheDuration(3 * time.Second)
+	// On first load, use shorter cache duration for faster initial display
+	if widget.isFirstLoad {
+		slog.Info("Video widget first load - fetching videos immediately")
+		widget.withCacheDuration(5 * time.Minute) // Shorter cache on first load
 		widget.isFirstLoad = false
+	} else {
+		// Normal updates use longer cache duration
+		widget.withCacheDuration(30 * time.Minute)
 	}
 
-	// Normal update flow - fetch videos
+	// Fetch videos immediately
 	widget.fetchVideos()
 	
-	// After successful fetch, extend cache duration for better performance
-	if widget.ContentAvailable {
-		widget.withCacheDuration(30 * time.Minute)
-		slog.Info("Videos fetched successfully - extending cache duration")
+	// After successful fetch, content is available
+	if len(widget.Videos) > 0 {
+		widget.ContentAvailable = true
+		slog.Info("Videos fetched successfully", "count", len(widget.Videos))
 	}
 }
 
@@ -231,10 +237,10 @@ func (widget *videosWidget) Render() template.HTML {
 
 	slog.Info("Rendering video widget", "style", widget.Style, "video_count", len(widget.Videos), "content_available", widget.ContentAvailable)
 
-	// If content is not available yet, show loading message with auto-refresh
+	// If content is not available yet, show loading message
 	if !widget.ContentAvailable {
 		slog.Info("Rendering loading state for videos")
-		return template.HTML("<div class=\"widget-loading\">Loading videos...<script>setTimeout(function(){window.location.reload();}, 5000);</script></div>")
+		return template.HTML("<div class=\"widget-loading\">Loading videos...</div>")
 	}
 
 	switch widget.Style {
